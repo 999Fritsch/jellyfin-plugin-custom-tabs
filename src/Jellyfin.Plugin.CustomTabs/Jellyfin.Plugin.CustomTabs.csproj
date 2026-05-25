@@ -51,7 +51,7 @@
     </ItemGroup>
     
     <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="Exists('C:\ProgramData\Jellyfin\Server_10_11\plugins\CustomTabs')">
-        <Exec Condition="'$(JellyfinVersion)' == '10.11.1'" Command="xcopy $(OutDir) &quot;C:\ProgramData\Jellyfin\Server_10_11\plugins\CustomTabs&quot; /y" />
+        <Exec Condition="$(JellyfinVersion.StartsWith('10.11'))" Command="xcopy $(OutDir) &quot;C:\ProgramData\Jellyfin\Server_10_11\plugins\CustomTabs&quot; /y" />
         <Exec Condition="'$(JellyfinVersion)' == '10.10.7'" Command="xcopy $(OutDir) &quot;C:\ProgramData\Jellyfin\Server_10_10_7\plugins\CustomTabs&quot; /y" />
     </Target>
 </Project>

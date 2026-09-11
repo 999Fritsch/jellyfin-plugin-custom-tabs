@@ -5,6 +5,8 @@ if (typeof window.customTabsPlugin == 'undefined') {
     window.customTabsPlugin = {
         initialized: false,
         currentPage: null,
+        renderedTabs: new Set(),
+        tabConfigs: {},
 
         // Kicks off the process
         init: function() {
@@ -44,6 +46,7 @@ if (typeof window.customTabsPlugin == 'undefined') {
             // Prevent creating duplicate tabs if they already exist
             if (tabsSlider.querySelector('[id^="customTabButton_"]')) {
                 console.debug('CustomTabs: Custom tabs already exist in DOM, skipping creation');
+                this.renderTabContent();
                 return;
             }
 
@@ -67,6 +70,7 @@ if (typeof window.customTabsPlugin == 'undefined') {
                 // Loop through configs and create a tab for each one
                 configs.forEach((config, i) => {
                     const customTabId = `customTabButton_${i}`;
+                    const customTabContentId = `customTab_${i}`;
 
                     // Final check to ensure this specific tab doesn't already exist
                     if (document.querySelector(`#${customTabId}`)) {
@@ -90,11 +94,81 @@ if (typeof window.customTabsPlugin == 'undefined') {
 
                     tabsSlider.appendChild(button);
                     console.log(`CustomTabs: Added tab ${customTabId} to tabs slider`);
+
+                    this.tabConfigs[customTabContentId] = config;
                 });
+
+                this.renderTabContent();
 
                 console.log('CustomTabs: All custom tabs created successfully');
             }).catch((error) => {
                 console.error('CustomTabs: Error fetching tab configs:', error);
+            });
+        },
+
+        // Render content into tab divs, properly executing <script> tags
+        renderTabContent: function() {
+            if (!this.tabConfigs) return;
+
+            Object.keys(this.tabConfigs).forEach((tabContentId) => {
+                if (this.renderedTabs.has(tabContentId)) return;
+
+                let tabDiv = document.getElementById(tabContentId);
+                if (!tabDiv) {
+                    tabDiv = this.ensureContentDiv(tabContentId);
+                    if (!tabDiv) return;
+                }
+
+                const config = this.tabConfigs[tabContentId];
+                this.setInnerHTMLWithScripts(tabDiv, config.ContentHtml || '');
+                this.renderedTabs.add(tabContentId);
+                console.debug(`CustomTabs: Rendered content for ${tabContentId}`);
+            });
+        },
+
+        // If the serve-time-injected content div is missing (e.g. browser
+        // cached an old home-html chunk), create it on the fly.
+        ensureContentDiv: function(tabContentId) {
+            const index = parseInt(tabContentId.replace('customTab_', ''), 10);
+            const contentDiv = document.createElement('div');
+            contentDiv.id = tabContentId;
+            contentDiv.setAttribute('data-index', index + 2);
+
+            const anchor = document.getElementById('favoritesTab');
+            if (anchor && anchor.parentNode) {
+                anchor.parentNode.insertBefore(contentDiv, anchor.nextSibling);
+                console.debug(`CustomTabs: Created missing content div ${tabContentId} after favoritesTab`);
+                return contentDiv;
+            }
+
+            const slider = document.querySelector('.emby-tabs-slider');
+            const page = slider ? slider.closest('.page') : null;
+            if (page) {
+                page.appendChild(contentDiv);
+                console.debug(`CustomTabs: Created missing content div ${tabContentId} (fallback to page)`);
+                return contentDiv;
+            }
+            return null;
+        },
+
+        // Set innerHTML but properly execute <script> tags
+        setInnerHTMLWithScripts: function(element, html) {
+            element.innerHTML = html;
+
+            const scripts = element.querySelectorAll('script');
+            scripts.forEach((oldScript) => {
+                const newScript = document.createElement('script');
+
+                for (let i = 0; i < oldScript.attributes.length; i++) {
+                    const attr = oldScript.attributes[i];
+                    newScript.setAttribute(attr.name, attr.value);
+                }
+
+                if (oldScript.textContent) {
+                    newScript.textContent = oldScript.textContent;
+                }
+
+                oldScript.parentNode.replaceChild(newScript, oldScript);
             });
         }
     };
